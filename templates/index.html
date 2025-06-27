@@ -28,31 +28,75 @@
 
     <div class="container mt-4">
         <div id="alert-container"></div>
-        <div class="row">
-            <div class="col-md-5">
-                <h3>{{ T.create_article_header }}</h3>
+
+        <!-- Step 1: Keyword Input -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h3 class="card-title">{{ T.create_article_header }}</h3>
                 <div class="mb-3">
                     <label for="keywords" class="form-label">{{ T.keywords_label }}</label>
                     <input type="text" class="form-control" id="keywords" placeholder="{{ T.keywords_placeholder }}">
                 </div>
-                <button id="generateBtn" class="btn btn-primary">{{ T.generate_btn }}</button>
-                <div id="loading" class="spinner-border text-primary ms-2" role="status" style="display: none;">
-                    <span class="visually-hidden">Loading...</span>
+                <button id="generateBtn" class="btn btn-primary">
+                    {{ T.generate_btn }}
+                    <div id="loading" class="spinner-border spinner-border-sm ms-2" role="status" style="display: none;">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </button>
+            </div>
+        </div>
+
+        <!-- Step 2: Manual Post Section -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h3 class="card-title">{{ T.manual_post_header }}</h3>
+                <div class="mb-3">
+                    <label for="manualTitle" class="form-label">{{ T.title_label }}</label>
+                    <input type="text" class="form-control" id="manualTitle" placeholder="{{ T.title_placeholder }}">
+                </div>
+                <div class="mb-3">
+                    <label for="manualContent" class="form-label">{{ T.content_label }} (Markdown)</label>
+                    <textarea class="form-control" id="manualContent" rows="10" placeholder="{{ T.content_placeholder }}"></textarea>
+                </div>
+                <button id="manualPreviewBtn" class="btn btn-secondary">{{ T.preview_btn }}</button>
+                <button id="manualPostBtn" class="btn btn-success">{{ T.manual_post_btn }}</button>
+            </div>
+        </div>
+
+        <!-- Step 2: Article Preview & Actions -->
+        <div id="article-preview-container" class="card mb-4" style="display: none;">
+            <div class="card-header">
+                <h3 id="article-title-preview"></h3>
+            </div>
+            <div class="card-body">
+                <div id="article-preview-content">
+                    <!-- Generated HTML content will be injected here -->
                 </div>
             </div>
-
-            <div class="col-md-7">
-                <h3>{{ T.review_post_header }}</h3>
-                <p class="form-text">{{ T.manual_post_note }}</p>
+            <div class="card-footer" id="action-buttons">
+                <button id="postBtn" class="btn btn-success">{{ T.post_btn }}</button>
+                <button id="editBtn" class="btn btn-secondary">{{ T.edit_btn }}</button>
+            </div>
+        </div>
+        
+        <!-- Step 3: Markdown Editor (hidden by default) -->
+        <div id="markdown-editor-container" class="card" style="display: none;">
+             <div class="card-header">
+                <h3>{{ T.edit_article_header }}</h3>
+            </div>
+            <div class="card-body">
                 <div class="mb-3">
                     <label for="articleTitle" class="form-label">{{ T.title_label }}</label>
-                    <input type="text" class="form-control" id="articleTitle" placeholder="{{ T.title_placeholder }}">
+                    <input type="text" class="form-control" id="articleTitle">
                 </div>
                 <div class="mb-3">
-                    <label for="articleContent" class="form-label">{{ T.content_label }}</label>
-                    <textarea class="form-control" id="articleContent" rows="15" placeholder="{{ T.content_placeholder }}"></textarea>
+                    <label for="articleContent" class="form-label">{{ T.content_label }} (Markdown)</label>
+                    <textarea class="form-control" id="articleContent" rows="15"></textarea>
                 </div>
-                <button id="postBtn" class="btn btn-success" disabled>{{ T.post_btn }}</button>
+            </div>
+            <div class="card-footer">
+                <button id="updatePreviewBtn" class="btn btn-primary">{{ T.update_preview_btn }}</button>
+                <button id="cancelEditBtn" class="btn btn-secondary">{{ T.cancel_btn }}</button>
             </div>
         </div>
     </div>

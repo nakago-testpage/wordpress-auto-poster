@@ -13,6 +13,10 @@
     "content_label": "Article Content",
     "content_placeholder": "Generated article content will appear here...",
     "post_btn": "Post to WordPress",
+    "edit_btn": "Edit",
+    "edit_article_header": "Edit Article (Markdown)",
+    "update_preview_btn": "Update Preview",
+    "cancel_btn": "Cancel",
     "modal_settings_title": "Settings",
     "openai_api_key_label": "API Key",
     "wp_url_label": "Site URL",
@@ -32,7 +36,10 @@
     "alert_post_success": "Article '{title}' posted successfully!",
     "alert_view_post": "View post at: {url}",
     "alert_error": "Error: {message}",
-    "manual_post_note": "Alternatively, you can paste your own title and content directly into the fields below and click 'Post to WordPress'."
+    "manual_post_note": "Alternatively, you can paste your own title and content directly into the fields below and click 'Post to WordPress'.",
+    "manual_post_header": "2. Manual Post",
+    "manual_post_btn": "Post Manually",
+    "preview_btn": "Preview"
   },
   "ja": {
     "app_title": "WordPress AI自動投稿ツール",
@@ -48,6 +55,10 @@
     "content_label": "記事の内容",
     "content_placeholder": "生成された記事の内容がここに表示されます...",
     "post_btn": "WordPressに投稿",
+    "edit_btn": "編集する",
+    "edit_article_header": "記事を編集する (Markdown)",
+    "update_preview_btn": "プレビューを更新",
+    "cancel_btn": "キャンセル",
     "modal_settings_title": "設定",
     "openai_api_key_label": "APIキー",
     "wp_url_label": "サイトURL",
@@ -67,6 +78,9 @@
     "alert_post_success": "記事「{title}」の投稿に成功しました！",
     "alert_view_post": "投稿を表示: {url}",
     "alert_error": "エラー: {message}",
-    "manual_post_note": "または、ご自身で用意したタイトルと本文を下の欄に直接貼り付けて「WordPressに投稿」することも可能です。"
+    "manual_post_note": "または、ご自身で用意したタイトルと本文を下の欄に直接貼り付けて「WordPressに投稿」することも可能です。",
+    "manual_post_header": "2. 手動で投稿",
+    "manual_post_btn": "手動で投稿",
+    "preview_btn": "プレビュー"
   }
 }

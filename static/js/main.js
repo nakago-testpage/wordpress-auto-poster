@@ -9,12 +9,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // General UI Elements
     const generateBtn = document.getElementById('generateBtn');
-    const postBtn = document.getElementById('postBtn');
     const keywordsInput = document.getElementById('keywords');
-    const articleTitleInput = document.getElementById('articleTitle');
-    const articleContentInput = document.getElementById('articleContent');
     const loading = document.getElementById('loading');
     const alertContainer = document.getElementById('alert-container');
+
+    // Article Preview Elements
+    const previewContainer = document.getElementById('article-preview-container');
+    const previewTitle = document.getElementById('article-title-preview');
+    const previewContent = document.getElementById('article-preview-content');
+    const postBtn = document.getElementById('postBtn');
+    const editBtn = document.getElementById('editBtn');
+
+    // Markdown Editor Elements
+    const editorContainer = document.getElementById('markdown-editor-container');
+    const articleTitleInput = document.getElementById('articleTitle');
+    const articleContentInput = document.getElementById('articleContent');
+    const updatePreviewBtn = document.getElementById('updatePreviewBtn');
+    const cancelEditBtn = document.getElementById('cancelEditBtn');
+
+    // Holds the state of the article being worked on
+    let currentArticle = {
+        title: '',
+        html_content: '',
+        markdown_content: ''
+    };
+
+    // Manual Post Elements
+    const manualPostBtn = document.getElementById('manualPostBtn');
+    const manualPreviewBtn = document.getElementById('manualPreviewBtn');
+    const manualTitleInput = document.getElementById('manualTitle');
+    const manualContentInput = document.getElementById('manualContent');
 
     // --- Helper Functions ---
 
@@ -29,58 +53,55 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
         alertContainer.innerHTML = ''; // Clear previous alerts
         alertContainer.append(wrapper);
-    };
+    }
 
-    // Update post button state based on whether title and content exist
-    const updatePostButtonState = () => {
-        const hasTitle = articleTitleInput.value.trim() !== '';
-        const hasContent = articleContentInput.value.trim() !== '';
-        postBtn.disabled = !(hasTitle && hasContent);
-    };
+    function toggleLoading(isLoading) {
+        loading.style.display = isLoading ? 'inline-block' : 'none';
+        generateBtn.disabled = isLoading;
+    }
 
-    // Load saved settings from localStorage
-    const loadSettings = () => {
-        openaiApiKeyInput.value = localStorage.getItem('openaiApiKey') || '';
-        wpUrlInput.value = localStorage.getItem('wpUrl') || '';
-        wpUsernameInput.value = localStorage.getItem('wpUsername') || '';
-        wpPasswordInput.value = localStorage.getItem('wpPassword') || '';
-    };
+    function showPreview() {
+        previewContainer.style.display = 'block';
+        editorContainer.style.display = 'none';
+    }
 
-    // Save settings to localStorage
-    const saveSettings = () => {
-        localStorage.setItem('openaiApiKey', openaiApiKeyInput.value);
-        localStorage.setItem('wpUrl', wpUrlInput.value);
-        localStorage.setItem('wpUsername', wpUsernameInput.value);
-        localStorage.setItem('wpPassword', wpPasswordInput.value);
-        showAlert(T.alert_settings_saved, 'success');
-        settingsModal.hide();
-    };
+    function showEditor() {
+        previewContainer.style.display = 'none';
+        editorContainer.style.display = 'block';
+        // Populate editor with current article data
+        articleTitleInput.value = currentArticle.title;
+        articleContentInput.value = currentArticle.markdown_content;
+    }
 
-    // --- Event Listeners ---
+    function hideEditor() {
+        editorContainer.style.display = 'none';
+        previewContainer.style.display = 'block';
+    }
 
-    // Update post button state on manual input
-    articleTitleInput.addEventListener('input', updatePostButtonState);
-    articleContentInput.addEventListener('input', updatePostButtonState);
+    function updateArticleState(data) {
+        currentArticle.title = data.title;
+        currentArticle.html_content = data.html_content;
+        currentArticle.markdown_content = data.markdown_content;
 
-    // Save settings
-    saveSettingsBtn.addEventListener('click', saveSettings);
+        // Update preview
+        previewTitle.textContent = currentArticle.title;
+        previewContent.innerHTML = currentArticle.html_content;
+    }
 
-    // Generate Article
-    generateBtn.addEventListener('click', async () => {
-        const keywords = keywordsInput.value;
-        const openaiApiKey = openaiApiKeyInput.value;
+    async function handleGenerateArticle() {
+        const keywords = keywordsInput.value.trim();
+        const openaiApiKey = localStorage.getItem('openaiApiKey');
 
         if (!keywords) {
-            showAlert(T.alert_keywords_required, 'warning');
+            showAlert(T.keywords_placeholder, 'warning');
             return;
         }
-        if (!openaiApiKey) {
-            showAlert(T.alert_openai_key_required, 'warning');
-            return;
-        }
+        // The check for openaiApiKey is removed to allow server-side key usage.
+        // The backend will now check for an environment variable if no key is provided.
 
-        loading.style.display = 'inline-block';
-        generateBtn.disabled = true;
+        toggleLoading(true);
+        previewContainer.style.display = 'none';
+        editorContainer.style.display = 'none';
 
         try {
             const response = await fetch('/generate-article', {
@@ -89,82 +110,229 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({ keywords, openai_api_key: openaiApiKey }),
             });
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-            }
-
             const data = await response.json();
-            articleTitleInput.value = data.title;
-            articleContentInput.value = data.content;
-            updatePostButtonState();
 
+            if (response.ok) {
+                updateArticleState(data);
+                showPreview();
+            } else {
+                showAlert(data.error || 'An unknown error occurred.');
+            }
         } catch (error) {
-            showAlert(T.alert_error.replace('{message}', error.message), 'danger');
+            showAlert('Failed to connect to the server. Please try again.');
         } finally {
-            loading.style.display = 'none';
-            generateBtn.disabled = false;
+            toggleLoading(false);
         }
-    });
+    }
 
-    // Post to WordPress
-    postBtn.addEventListener('click', async () => {
-        const title = articleTitleInput.value;
-        const content = articleContentInput.value;
-        const wpUrl = wpUrlInput.value;
-        const wpUsername = wpUsernameInput.value;
-        const wpPassword = wpPasswordInput.value;
+    async function handleUpdatePreview() {
+        const newMarkdown = articleContentInput.value;
+        const newTitle = articleTitleInput.value;
 
+        try {
+            const response = await fetch('/convert-markdown', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ markdown_text: newMarkdown })
+            });
+            const data = await response.json();
+
+            if (response.ok) {
+                // Update state with new title and converted HTML
+                currentArticle.title = newTitle;
+                currentArticle.html_content = data.html_content;
+                currentArticle.markdown_content = newMarkdown;
+
+                // Update preview display and switch back
+                previewTitle.textContent = currentArticle.title;
+                previewContent.innerHTML = currentArticle.html_content;
+                hideEditor();
+            } else {
+                showAlert(data.error || 'Failed to update preview.');
+            }
+        } catch (error) {
+            showAlert('Failed to connect to server for preview update.');
+        }
+    }
+
+    async function handlePostToWordPress() {
+        const { title, html_content } = currentArticle;
+        const wpUrl = localStorage.getItem('wpUrl');
+        const wpUsername = localStorage.getItem('wpUsername');
+        const wpPassword = localStorage.getItem('wpPassword');
+
+        if (!title || !html_content) {
+            showAlert(T.alert_title_content_required);
+            return;
+        }
         if (!wpUrl || !wpUsername || !wpPassword) {
-            showAlert(T.alert_wp_credentials_required, 'warning');
-            settingsModal.show();
+            showAlert(T.alert_wp_creds_missing);
             return;
         }
 
-        loading.style.display = 'inline-block';
         postBtn.disabled = true;
-        showAlert(T.alert_posting, 'info');
+        postBtn.textContent = T.alert_posting;
 
         try {
             const response = await fetch('/post-to-wordpress', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    title,
-                    content,
-                    wp_url: wpUrl,
-                    wp_username: wpUsername,
-                    wp_password: wpPassword,
+                body: JSON.stringify({ 
+                    title: title,
+                    content: html_content, // Send the final HTML content
+                    wp_url: wpUrl, 
+                    wp_username: wpUsername, 
+                    wp_password: wpPassword 
                 }),
             });
 
-            const result = await response.json();
+            const data = await response.json();
 
             if (response.ok) {
-                const successMessage = `
-                    ${T.alert_post_success.replace('{title}', title)}
-                    <a href="${result.url}" target="_blank" class="alert-link">${result.url}</a>
-                `;
-                showAlert(successMessage, 'success');
-                // Clear fields after successful post
-                articleTitleInput.value = '';
-                articleContentInput.value = '';
-                keywordsInput.value = '';
-                updatePostButtonState();
+                let successMsg = T.alert_post_success.replace('{title}', title);
+                if (data.url) {
+                    successMsg += ` <a href="${data.url}" target="_blank">${T.wp_url_label}</a>`;
+                }
+                showAlert(successMsg, 'success');
             } else {
-                throw new Error(result.error || 'Failed to post.');
+                showAlert(data.error || 'An unknown error occurred during posting.');
             }
         } catch (error) {
-            showAlert(T.alert_error.replace('{message}', error.message), 'danger');
+            showAlert('Failed to connect to the WordPress server.');
         } finally {
-            loading.style.display = 'none';
-            // Re-enable button but let updatePostButtonState decide final state
             postBtn.disabled = false;
-            updatePostButtonState();
+            postBtn.textContent = T.post_btn;
         }
-    });
+    }
 
-    // --- Initial Load ---
+    async function handleManualPreview() {
+        const title = manualTitleInput.value.trim();
+        const markdownContent = manualContentInput.value.trim();
+
+        if (!title || !markdownContent) {
+            showAlert(T.alert_title_content_required, 'warning');
+            return;
+        }
+
+        try {
+            const response = await fetch('/convert-markdown', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ markdown_text: markdownContent })
+            });
+            const data = await response.json();
+
+            if (response.ok) {
+                updateArticleState({
+                    title: title,
+                    html_content: data.html_content,
+                    markdown_content: markdownContent
+                });
+                showPreview();
+            } else {
+                showAlert(data.error || 'Failed to update preview.', 'danger');
+            }
+        } catch (error) {
+            showAlert(`Error: ${error.message}`, 'danger');
+        }
+    }
+
+    async function handleManualPost() {
+        const title = manualTitleInput.value.trim();
+        const markdownContent = manualContentInput.value.trim();
+        const wpUrl = localStorage.getItem('wpUrl');
+        const wpUsername = localStorage.getItem('wpUsername');
+        const wpPassword = localStorage.getItem('wpPassword');
+
+        if (!title || !markdownContent) {
+            showAlert(T.alert_title_content_required, 'warning');
+            return;
+        }
+
+        if (!wpUrl || !wpUsername || !wpPassword) {
+            showAlert(T.alert_wp_creds_missing, 'warning');
+            return;
+        }
+
+        manualPostBtn.disabled = true;
+        manualPostBtn.textContent = T.alert_posting;
+
+        try {
+            // Step 1: Convert Markdown to HTML
+            const convertResponse = await fetch('/convert-markdown', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ markdown_text: markdownContent })
+            });
+
+            const convertData = await convertResponse.json();
+            if (!convertResponse.ok) {
+                throw new Error(convertData.error || 'Failed to convert Markdown.');
+            }
+            const htmlContent = convertData.html_content;
+
+            // Step 2: Post to WordPress
+            const postResponse = await fetch('/post-to-wordpress', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: title,
+                    content: htmlContent,
+                    wp_url: wpUrl,
+                    wp_username: wpUsername,
+                    wp_password: wpPassword
+                }),
+            });
+
+            const postData = await postResponse.json();
+
+            if (postResponse.ok) {
+                let successMsg = T.alert_post_success.replace('{title}', title);
+                if (postData.url) {
+                    successMsg += ` <a href="${postData.url}" target="_blank">${T.wp_url_label}</a>`;
+                }
+                showAlert(successMsg, 'success');
+                manualTitleInput.value = ''; // Clear fields on success
+                manualContentInput.value = '';
+            } else {
+                showAlert(postData.error || 'An unknown error occurred during posting.', 'danger');
+            }
+        } catch (error) {
+            showAlert(`Error: ${error.message}`, 'danger');
+        } finally {
+            manualPostBtn.disabled = false;
+            manualPostBtn.textContent = T.manual_post_btn;
+        }
+    }
+
+    function saveSettings() {
+        localStorage.setItem('openaiApiKey', document.getElementById('openaiApiKey').value);
+        localStorage.setItem('wpUrl', document.getElementById('wpUrl').value);
+        localStorage.setItem('wpUsername', document.getElementById('wpUsername').value);
+        localStorage.setItem('wpPassword', document.getElementById('wpPassword').value);
+        
+        const settingsModal = bootstrap.Modal.getInstance(document.getElementById('settingsModal'));
+        settingsModal.hide();
+        showAlert(T.alert_settings_saved, 'success');
+    }
+
+    function loadSettings() {
+        document.getElementById('openaiApiKey').value = localStorage.getItem('openaiApiKey') || '';
+        document.getElementById('wpUrl').value = localStorage.getItem('wpUrl') || '';
+        document.getElementById('wpUsername').value = localStorage.getItem('wpUsername') || '';
+        document.getElementById('wpPassword').value = localStorage.getItem('wpPassword') || '';
+    }
+
+    // --- Event Listeners ---
+    if (generateBtn) generateBtn.addEventListener('click', handleGenerateArticle);
+    if (postBtn) postBtn.addEventListener('click', handlePostToWordPress);
+    if (editBtn) editBtn.addEventListener('click', showEditor);
+    if (updatePreviewBtn) updatePreviewBtn.addEventListener('click', handleUpdatePreview);
+    if (cancelEditBtn) cancelEditBtn.addEventListener('click', hideEditor);
+    if (saveSettingsBtn) saveSettingsBtn.addEventListener('click', saveSettings);
+    if (manualPostBtn) manualPostBtn.addEventListener('click', handleManualPost);
+    if (manualPreviewBtn) manualPreviewBtn.addEventListener('click', handleManualPreview);
+
+    // Load settings from localStorage on page load
     loadSettings();
-    updatePostButtonState(); // Initial check for post button state
 });

@@ -1,7 +1,9 @@
 import os
 import json
 import openai
+import markdown2
 import requests
+import argparse
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 from requests.auth import HTTPBasicAuth
 
@@ -39,7 +41,7 @@ def set_language(lang):
 
 @app.route('/generate-article', methods=['POST'])
 def generate_article():
-    """Generates an article using OpenAI based on keywords and language."""
+    """Generates an article using OpenAI, formats it as Markdown, and converts to HTML."""
     data = request.get_json()
     keywords = data.get('keywords')
     openai_api_key = data.get('openai_api_key')
@@ -47,29 +49,52 @@ def generate_article():
     if not keywords:
         return jsonify({'error': 'Keywords are required.'}), 400
 
-    openai.api_key = openai_api_key
+    # Prioritize API key from the request, but fall back to environment variable
+    api_key = openai_api_key or os.environ.get('OPENAI_API_KEY')
+
+    if not api_key:
+        page_texts = get_page_texts(get_language())
+        error_msg = page_texts.get('alert_api_key_missing', 'OpenAI API key is not configured. Please provide it in the settings or set the OPENAI_API_KEY environment variable on the server.')
+        return jsonify({'error': error_msg}), 400
+
+    openai.api_key = api_key
     lang = get_language()
     language_name = "日本語" if lang == "ja" else "English"
 
     try:
         prompt = f"""
-        Please generate a high-quality, SEO-friendly blog post in {language_name} based on the following keywords.
+        You are a professional blog writer tasked with creating a high-quality, SEO-friendly blog post in {language_name}.
+        The article must be well-structured for the WordPress block editor.
 
         # Keywords
         {keywords}
 
+        # Instructions
+        1.  Create a compelling and relevant title.
+        2.  Write the article content using Markdown format.
+        3.  The structure must include:
+            - A main heading (H2).
+            - Several subheadings (H3).
+            - Paragraphs, and where appropriate, bulleted or numbered lists.
+        4.  Ensure the content is engaging, informative, and optimized for the given keywords.
+
         # Output Format
-        Please return only the title and content of the article in the following format, without any other text.
+        Strictly adhere to the following format. Do not include any other text, explanations, or backticks.
         ---
         Title: [Insert title here]
         ---
-        Content: [Insert content here]
+        Content:
+        ## [Main Heading Here]
+        [Paragraphs of text...]
+
+        ### [Subheading Here]
+        [Paragraphs of text...]
         """
 
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are a professional blog writer."},
+                {"role": "system", "content": "You are a professional blog writer who is an expert in Markdown."},
                 {"role": "user", "content": prompt}
             ]
         )
@@ -80,13 +105,20 @@ def generate_article():
         parts = article_text.split('---')
         if len(parts) >= 3:
             title = parts[1].replace('Title:', '').strip()
-            content = parts[2].replace('Content:', '').strip()
+            markdown_content = parts[2].replace('Content:', '', 1).strip()
         else:
             # Fallback if the format is not as expected
             title = "Generated Article"
-            content = article_text
+            markdown_content = article_text
 
-        return jsonify({'title': title, 'content': content})
+        # Convert Markdown to HTML
+        html_content = markdown2.markdown(markdown_content)
+
+        return jsonify({
+            'title': title,
+            'html_content': html_content,
+            'markdown_content': markdown_content
+        })
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -156,5 +188,16 @@ def post_to_wordpress():
         print(f"An unexpected error occurred in post_to_wordpress: {e}")
         return jsonify({'error': 'An unexpected server error occurred. Please check the logs.'}), 500
 
+@app.route('/convert-markdown', methods=['POST'])
+def convert_markdown():
+    """Converts Markdown text to HTML for preview updates."""
+    data = request.get_json()
+    markdown_text = data.get('markdown_text', '')
+    html_content = markdown2.markdown(markdown_text)
+    return jsonify({'html_content': html_content})
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    parser = argparse.ArgumentParser(description='Run the Flask app on a specified port.')
+    parser.add_argument('--port', type=int, default=5000, help='The port to run the web server on.')
+    args = parser.parse_args()
+    app.run(debug=True, port=args.port)
